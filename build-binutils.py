@@ -27,12 +27,12 @@ def current_binutils():
     return "binutils-2.39"
 
 
-def download_binutils(folder):
+def download_binutils(folder, version):
     """
     Downloads the latest stable version of binutils
     :param folder: Directory to download binutils to
     """
-    binutils = current_binutils()
+    binutils = version
     binutils_folder = folder.joinpath(binutils)
     if not binutils_folder.is_dir():
         # Remove any previous copies of binutils
@@ -374,7 +374,7 @@ def main():
                 binutils_folder = root_folder.joinpath(binutils_folder)
         else:
             binutils_folder = root_folder.joinpath(version)
-            download_binutils(root_folder)
+            download_binutils(root_folder, version)
 
         build_folder = pathlib.Path(args.build_folder)
         if not build_folder.is_absolute():
