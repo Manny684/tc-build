@@ -11,6 +11,12 @@ import re
 import shutil
 import subprocess
 import utils
+from pathlib import Path
+
+
+def binutils_releases():
+    for r in Path("./binutils_releases.txt").read_text().splitlines():
+        yield r
 
 
 def current_binutils():
@@ -30,7 +36,7 @@ def download_binutils(folder):
     binutils_folder = folder.joinpath(binutils)
     if not binutils_folder.is_dir():
         # Remove any previous copies of binutils
-        for entity in folder.glob('binutils-*'):
+        for entity in folder.glob("binutils-*"):
             if entity.is_dir():
                 shutil.rmtree(entity)
             else:
@@ -39,15 +45,16 @@ def download_binutils(folder):
         # Download the tarball
         binutils_tarball = folder.joinpath(binutils + ".tar.xz")
         curl_cmd = [
-            "curl", "-LSs", "-o", binutils_tarball,
-            "https://ftp.gnu.org/gnu/binutils/" + binutils_tarball.name
+            "curl",
+            "-LSs",
+            "-o",
+            binutils_tarball,
+            "https://ftp.gnu.org/gnu/binutils/" + binutils_tarball.name,
         ]
         subprocess.run(curl_cmd, check=True)
-        verify_binutils_checksum(binutils_tarball)
+        # verify_binutils_checksum(binutils_tarball)
         # Extract the tarball then remove it
-        subprocess.run(["tar", "-xJf", binutils_tarball.name],
-                       check=True,
-                       cwd=folder)
+        subprocess.run(["tar", "-xJf", binutils_tarball.name], check=True, cwd=folder)
         utils.create_gitignore(binutils_folder)
         binutils_tarball.unlink()
 
@@ -63,20 +70,18 @@ def verify_binutils_checksum(file_to_check):
             file_hash.update(data)
     # Get good hash from file
     curl_cmd = [
-        'curl', '-fLSs',
-        'https://sourceware.org/pub/binutils/releases/sha512.sum'
+        "curl",
+        "-fLSs",
+        "https://sourceware.org/pub/binutils/releases/sha512.sum",
     ]
-    sha512_sums = subprocess.run(curl_cmd,
-                                 capture_output=True,
-                                 check=True,
-                                 text=True).stdout
-    line_match = fr"([0-9a-f]+)\s+{file_to_check.name}$"
+    sha512_sums = subprocess.run(
+        curl_cmd, capture_output=True, check=True, text=True
+    ).stdout
+    line_match = rf"([0-9a-f]+)\s+{file_to_check.name}$"
     if not (match := re.search(line_match, sha512_sums, flags=re.M)):
-        raise RuntimeError(
-            "Could not find binutils hash in sha512.sum output?")
+        raise RuntimeError("Could not find binutils hash in sha512.sum output?")
     if file_hash.hexdigest() != match.groups()[0]:
-        raise RuntimeError(
-            "binutils: SHA512 checksum does not match known good one!")
+        raise RuntimeError("binutils: SHA512 checksum does not match known good one!")
 
 
 def host_arch_target():
@@ -88,7 +93,7 @@ def host_arch_target():
         "armv7l": "arm",
         "ppc64": "powerpc64",
         "ppc64le": "powerpc64le",
-        "ppc": "powerpc"
+        "ppc": "powerpc",
     }
     machine = platform.machine()
     return host_mapping.get(machine, machine)
@@ -119,42 +124,51 @@ def parse_parameters(root_folder):
     :return: A 'Namespace' object with all the options parsed from supplied parameters
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-b",
-                        "--binutils-folder",
-                        help="""
+    parser.add_argument(
+        "-b",
+        "--binutils-folder",
+        help="""
                         By default, the script will download a copy of the binutils source in the same folder as
                         this script. If you have your own copy of the binutils source that you would like to build
                         from, pass it to this parameter. This can either be an absolute or relative path.
                         """,
-                        type=str)
-    parser.add_argument("-B",
-                        "--build-folder",
-                        help="""
+        type=str,
+    )
+    parser.add_argument(
+        "-B",
+        "--build-folder",
+        help="""
                         By default, the script will create a "build" folder in the same folder as this script,
                         then a "binutils" folder within that one and build the files there. If you would like
                         that done somewhere else, pass it to this parameter. This can either be an absolute
                         or relative path.
                         """,
-                        type=str,
-                        default=root_folder.joinpath("build", "binutils"))
-    parser.add_argument("-I",
-                        "--install-folder",
-                        help="""
+        type=str,
+        default=root_folder.joinpath("build", "binutils"),
+    )
+    parser.add_argument(
+        "-I",
+        "--install-folder",
+        help="""
                         By default, the script will create an "install" folder in the same folder as this script
                         and install binutils there. If you'd like to have it installed somewhere else, pass
                         it to this parameter. This can either be an absolute or relative path.
                         """,
-                        type=str,
-                        default=root_folder.joinpath("install"))
-    parser.add_argument("-s",
-                        "--skip-install",
-                        help="""
+        type=str,
+        default=root_folder.joinpath("install"),
+    )
+    parser.add_argument(
+        "-s",
+        "--skip-install",
+        help="""
                         Skip installing binutils into INSTALL_FOLDER
                         """,
-                        action="store_true")
-    parser.add_argument("-t",
-                        "--targets",
-                        help="""
+        action="store_true",
+    )
+    parser.add_argument(
+        "-t",
+        "--targets",
+        help="""
                         The script can build binutils targeting arm-linux-gnueabi, aarch64-linux-gnu,
                         mipsel-linux-gnu, powerpc-linux-gnu, powerpc64-linux-gnu, powerpc64le-linux-gnu,
                         riscv64-linux-gnu, s390x-linux-gnu, and x86_64-linux-gnu.
@@ -163,15 +177,18 @@ def parse_parameters(root_folder):
                         or all if you want to build all targets (which is the default). It will only add the
                         target prefix if it is not for the host architecture.
                         """,
-                        nargs="+")
-    parser.add_argument("-m",
-                        "--march",
-                        metavar="ARCH",
-                        help="""
+        nargs="+",
+    )
+    parser.add_argument(
+        "-m",
+        "--march",
+        metavar="ARCH",
+        help="""
                         Add -march=ARCH and -mtune=ARCH to CFLAGS to optimize the toolchain for the target
                         host processor.
                         """,
-                        type=str)
+        type=str,
+    )
     return parser.parse_args()
 
 
@@ -191,7 +208,7 @@ def create_targets(targets):
         "powerpc": "powerpc-linux-gnu",
         "riscv64": "riscv64-linux-gnu",
         "s390x": "s390x-linux-gnu",
-        "x86_64": "x86_64-linux-gnu"
+        "x86_64": "x86_64-linux-gnu",
     }
 
     targets_set = set()
@@ -217,8 +234,7 @@ def cleanup(build_folder):
     build_folder.mkdir(parents=True, exist_ok=True)
 
 
-def invoke_configure(binutils_folder, build_folder, install_folder, target,
-                     host_arch):
+def invoke_configure(binutils_folder, build_folder, install_folder, target, host_arch):
     """
     Invokes the configure script to generate a Makefile
     :param binutils_folder: Binutils source folder
@@ -229,68 +245,71 @@ def invoke_configure(binutils_folder, build_folder, install_folder, target,
     """
     configure = [
         binutils_folder.joinpath("configure"),
-        'CC=gcc',
-        'CXX=g++',
-        '--disable-compressed-debug-sections',
-        '--disable-gdb',
-        '--disable-nls',
-        '--disable-werror',
-        '--enable-deterministic-archives',
-        '--enable-new-dtags',
-        '--enable-plugins',
-        '--enable-threads',
-        '--quiet',
-        '--with-system-zlib',
+        "CC=gcc",
+        "CXX=g++",
+        "--disable-compressed-debug-sections",
+        "--disable-gdb",
+        "--disable-nls",
+        "--disable-werror",
+        "--enable-deterministic-archives",
+        "--enable-new-dtags",
+        "--enable-plugins",
+        "--enable-threads",
+        "--quiet",
+        "--with-system-zlib",
     ]  # yapf: disable
     if install_folder:
-        configure += [f'--prefix={install_folder}']
+        configure += [f"--prefix={install_folder}"]
     if host_arch:
         configure += [
-            f'CFLAGS=-O2 -march={host_arch} -mtune={host_arch}',
-            f'CXXFLAGS=-O2 -march={host_arch} -mtune={host_arch}'
+            f"CFLAGS=-O2 -march={host_arch} -mtune={host_arch}",
+            f"CXXFLAGS=-O2 -march={host_arch} -mtune={host_arch}",
         ]
     else:
-        configure += ['CFLAGS=-O2', 'CXXFLAGS=-O2']
+        configure += ["CFLAGS=-O2", "CXXFLAGS=-O2"]
     # gprofng uses glibc APIs that might not be available on musl
     if utils.libc_is_musl():
-        configure += ['--disable-gprofng']
+        configure += ["--disable-gprofng"]
 
     configure_arch_flags = {
         "arm-linux-gnueabi": [
-            '--disable-multilib',
-            '--with-gnu-as',
-            '--with-gnu-ld',
+            "--disable-multilib",
+            "--with-gnu-as",
+            "--with-gnu-ld",
         ],
         "powerpc-linux-gnu": [
-            '--disable-sim',
-            '--enable-lto',
-            '--enable-relro',
-            '--with-pic',
+            "--disable-sim",
+            "--enable-lto",
+            "--enable-relro",
+            "--with-pic",
         ],
     }  # yapf: disable
-    configure_arch_flags['aarch64-linux-gnu'] = [
-        *configure_arch_flags['arm-linux-gnueabi'],
-        '--enable-gold',
-        '--enable-ld=default',
+    configure_arch_flags["aarch64-linux-gnu"] = [
+        *configure_arch_flags["arm-linux-gnueabi"],
+        "--enable-gold",
+        "--enable-ld=default",
     ]
-    configure_arch_flags['powerpc64-linux-gnu'] = configure_arch_flags[
-        'powerpc-linux-gnu']
-    configure_arch_flags['powerpc64le-linux-gnu'] = configure_arch_flags[
-        'powerpc-linux-gnu']
-    configure_arch_flags['riscv64-linux-gnu'] = configure_arch_flags[
-        'powerpc-linux-gnu']
-    configure_arch_flags['s390x-linux-gnu'] = [
-        *configure_arch_flags['powerpc-linux-gnu'],
-        '--enable-targets=s390-linux-gnu',
+    configure_arch_flags["powerpc64-linux-gnu"] = configure_arch_flags[
+        "powerpc-linux-gnu"
     ]
-    configure_arch_flags['x86_64-linux-gnu'] = [
-        *configure_arch_flags['powerpc-linux-gnu'],
-        '--enable-targets=x86_64-pep',
+    configure_arch_flags["powerpc64le-linux-gnu"] = configure_arch_flags[
+        "powerpc-linux-gnu"
+    ]
+    configure_arch_flags["riscv64-linux-gnu"] = configure_arch_flags[
+        "powerpc-linux-gnu"
+    ]
+    configure_arch_flags["s390x-linux-gnu"] = [
+        *configure_arch_flags["powerpc-linux-gnu"],
+        "--enable-targets=s390-linux-gnu",
+    ]
+    configure_arch_flags["x86_64-linux-gnu"] = [
+        *configure_arch_flags["powerpc-linux-gnu"],
+        "--enable-targets=x86_64-pep",
     ]
 
     for endian in ["", "el"]:
-        configure_arch_flags[f'mips{endian}-linux-gnu'] = [
-            f'--enable-targets=mips64{endian}-linux-gnuabi64,mips64{endian}-linux-gnuabin32'
+        configure_arch_flags[f"mips{endian}-linux-gnu"] = [
+            f"--enable-targets=mips64{endian}-linux-gnuabi64,mips64{endian}-linux-gnuabin32"
         ]
 
     configure += configure_arch_flags.get(target, [])
@@ -298,7 +317,7 @@ def invoke_configure(binutils_folder, build_folder, install_folder, target,
     # If the current machine is not the target, add the prefix to indicate
     # that it is a cross compiler
     if not host_is_target(target):
-        configure += [f'--program-prefix={target}-', f'--target={target}']
+        configure += [f"--program-prefix={target}-", f"--target={target}"]
 
     utils.print_header(f"Building {target} binutils")
     subprocess.run(configure, check=True, cwd=build_folder)
@@ -311,14 +330,14 @@ def invoke_make(build_folder, install_folder, target):
     :param install_folder: Directory to install binutils to
     :param target: Target to compile for
     """
-    make = ['make', '-s', '-j' + str(multiprocessing.cpu_count()), 'V=0']
+    make = ["make", "-s", "-j" + str(multiprocessing.cpu_count()), "V=0"]
     if host_is_target(target):
-        subprocess.run(make + ['configure-host'], check=True, cwd=build_folder)
+        subprocess.run(make + ["configure-host"], check=True, cwd=build_folder)
     subprocess.run(make, check=True, cwd=build_folder)
     if install_folder:
-        subprocess.run(make + [f'prefix={install_folder}', 'install'],
-                       check=True,
-                       cwd=build_folder)
+        subprocess.run(
+            make + [f"prefix={install_folder}", "install"], check=True, cwd=build_folder
+        )
         with install_folder.joinpath(".gitignore").open("w") as gitignore:
             gitignore.write("*")
 
@@ -336,8 +355,9 @@ def build_targets(binutils_folder, build, install_folder, targets, host_arch):
     for target in targets:
         build_folder = build.joinpath(target)
         cleanup(build_folder)
-        invoke_configure(binutils_folder, build_folder, install_folder, target,
-                         host_arch)
+        invoke_configure(
+            binutils_folder, build_folder, install_folder, target, host_arch
+        )
         invoke_make(build_folder, install_folder, target)
 
 
@@ -346,32 +366,38 @@ def main():
 
     args = parse_parameters(root_folder)
 
-    if args.binutils_folder:
-        binutils_folder = pathlib.Path(args.binutils_folder)
-        if not binutils_folder.is_absolute():
-            binutils_folder = root_folder.joinpath(binutils_folder)
-    else:
-        binutils_folder = root_folder.joinpath(current_binutils())
-        download_binutils(root_folder)
+    for version in binutils_releases():
 
-    build_folder = pathlib.Path(args.build_folder)
-    if not build_folder.is_absolute():
-        build_folder = root_folder.joinpath(build_folder)
+        if args.binutils_folder:
+            binutils_folder = pathlib.Path(args.binutils_folder)
+            if not binutils_folder.is_absolute():
+                binutils_folder = root_folder.joinpath(binutils_folder)
+        else:
+            binutils_folder = root_folder.joinpath(version)
+            download_binutils(root_folder)
 
-    if args.skip_install:
-        install_folder = None
-    else:
-        install_folder = pathlib.Path(args.install_folder)
-        if not install_folder.is_absolute():
-            install_folder = root_folder.joinpath(install_folder)
+        build_folder = pathlib.Path(args.build_folder)
+        if not build_folder.is_absolute():
+            build_folder = root_folder.joinpath(build_folder)
 
-    targets = ["all"]
-    if args.targets is not None:
-        targets = args.targets
+        if args.skip_install:
+            install_folder = None
+        else:
+            install_folder = pathlib.Path(args.install_folder) / version
+            if not install_folder.is_absolute():
+                install_folder = root_folder.joinpath(install_folder)
 
-    build_targets(binutils_folder, build_folder, install_folder,
-                  create_targets(targets), args.march)
+        targets = ["all"]
+        if args.targets is not None:
+            targets = args.targets
 
+        build_targets(
+            binutils_folder,
+            build_folder,
+            install_folder,
+            create_targets(targets),
+            args.march,
+        )
 
-if __name__ == '__main__':
-    main()
+    if __name__ == "__main__":
+        main()
